@@ -1,5 +1,7 @@
 #include<stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <time.h>
 
 #define MEMORY_SIZE 4096
 #define MEMORY_START 0x200
@@ -113,16 +115,41 @@ void emulateCycle() {
                 case (0x0006):
                     reg[x] = reg[x] >> 1;
                     reg[0xF] = reg[x] & 0x1;
+                    break;
                 case (0x0007):
-                    
-
+                    reg[x] = reg[y] - reg[x];
+                    if (reg[y] > reg[x]) {
+                            reg[0xF] = 1;
+                    }
+                    else {
+                        reg[0xF] = 0;
+                    }
+                    break;
+                case (0x0008):
+                    reg[0xF] = reg[x] << 1;
+                    reg[0xF] = reg[x] & 0x1;
+                    break;
+                case (0x0009):
+                    if (reg[x] != reg[y]) {
+                        PC += 2;
+                    }
+                    break;
             }
+            case (0xA000):
+                I = nnn;
+                break;
+            case (0xB000):
+                PC = nnn + reg[0x0];
+            case (0xC000):
+                reg[x] = rand() & 0xff;
+            case ()
             break;
     }
 
 }
 
 int main() {
+    srand(time(NULL));
     loadFile();
     emulateCycle();
     return 0;
