@@ -45,11 +45,22 @@ void emulateCycle() {
     uint16_t y = ((opcode >> 4) & 0xF);
     uint16_t kk = (opcode & 0xFF);
     uint16_t temp = opcode & 0xF;
+    uint16_t temp2 = opcode & 0xFF;
     uint16_t VF;
     uint16_t result;
 
     // decode
     switch (opcode & 0xF) {
+        case (0x0000):
+            switch (temp2) {
+                case (0x00E0):
+                    break;
+                case (0x00EE):
+                    PC = stack[SP];
+                    SP--;
+                    break;
+            }
+            break;
         case (0x1000):
             PC = opcode & 0x0FFF;
             break;
@@ -135,22 +146,82 @@ void emulateCycle() {
                     }
                     break;
             }
-            case (0xA000):
-                I = nnn;
-                break;
-            case (0xB000):
-                PC = nnn + reg[0x0];
-            case (0xC000):
-                reg[x] = rand() & 0xff;
-            case ()
+        case (0xA000):
+            I = nnn;
             break;
-    }
+        case (0xB000):
+            PC = nnn + reg[0x0];
+            break;
+        case (0xC000):
+            reg[x] = rand() & 0xff;
+            break;
+        case (0xD000):
+            break;
+        case (0xE000):
+            switch (temp2){
+                case (0x009E):
+                    if (reg[x] == 1) { // is key pressed down?
+                    PC += 2;
+                    break;
+                }
+                case (0x00A1):
+                    if (reg[x] == 0) {
+                        PC += 2;
+                    }
+                    break;
+            }
+            break;
+        case (0xF000):
+            switch (temp2){
+                case (0x0007):
+                    reg[x] = delay;
+                    break;
+                case (0x000A):
+                    if (1) { // if key is pressed
 
+                    }
+                    break;
+                case (0x0015):
+                    delay = reg[x];
+                    break;
+                case (0x0018):
+                    sound = reg[x];
+                    break;
+                case (0x001E):
+                    I = I + reg[x];
+                    break;
+                case (0x0029):
+                    I = reg[x]; // fix this
+                    break;
+                case (0x0033):
+                    char hex_str[20];
+                    long dec_num;
+                    sprintf(hex_str, "%X", opcode);
+                    dec_num = strtol(hex_str, NULL, 16);
+                    memory[I] = dec_num / 100;
+                    memory[I + 1] = (dec_num % 100) / 10;
+                    memory[I + 2] = dec_num % 10;
+                    break;
+                case (0x0055):
+                    for (int i = 0; i < 16; i++) {
+                        memory[I + i] = reg[i]; // might wanna change the 0xF thing
+                    }
+                    break;
+            }
+    }
+    if (delay > 0) delay--;
+    if (sound > 0) {
+        sound--;
+        printf("beeeeeep");
+    }
+    PC += 2;
 }
 
 int main() {
     srand(time(NULL));
     loadFile();
-    emulateCycle();
+    while (1){
+        emulateCycle();
+    }
     return 0;
 }
