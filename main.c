@@ -40,7 +40,7 @@ uint8_t SP; // stack pointer
 uint16_t I; // current address
 uint16_t PC = 0x200; // next address
 uint16_t stack[16]; // stack
-uint16_t memory[MEMORY_SIZE];
+uint8_t memory[MEMORY_SIZE];
 uint8_t delay;
 uint8_t sound;
 bool screen [SCREEN_WIDTH * SCREEN_HEIGHT] = {false};
@@ -63,7 +63,7 @@ void loadFile () {
     size_t file_size = ftell(file); // get the position
     fseek(file, 0, SEEK_SET); // return to the starting position
 
-    size_t result = fread(memory + 0x200, 1, sizeof(memory) - 0x200, file);
+    size_t result = fread(memory + 0x200, sizeof(uint16_t), file_size, file);
 }
 
 void loadFontSet() {
@@ -74,18 +74,18 @@ void loadFontSet() {
 
 void emulateCycle() {
     drawFlag = false;
-    uint16_t opcode = memory[PC]; // why 16? 
+    uint16_t opcode = memory[PC] << 8 | memory[PC + 1]; // why 16? 
     PC += 2;
     printf("Opcode: 0x%04X\n", opcode);
     
     // extraction
-    uint16_t nnn = (opcode & 0xFFF);
-    uint16_t n = (opcode & 0xF);
-    uint16_t x = ((opcode >> 8) & 0xF);
-    uint16_t y = ((opcode >> 4) & 0xF);
-    uint16_t kk = (opcode & 0xFF);
-    uint16_t temp = opcode & 0xF;
-    uint16_t temp2 = opcode & 0xFF;
+    uint16_t nnn = (opcode & 0x0FFF);
+    uint8_t n = (opcode & 0x000F);
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+    uint8_t kk = (opcode & 0x00FF);
+    uint8_t temp = opcode & 0x000F;
+    uint8_t temp2 = opcode & 0x00FF;
     uint16_t VF;
     uint16_t result;
 
@@ -95,7 +95,7 @@ void emulateCycle() {
             switch (temp2) {
                 case (0x00E0):
                     for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
-                        screen[i] = 0;
+                        screen[i] = false;
                     }
                     break;
                 case (0x00EE):
@@ -185,8 +185,12 @@ void emulateCycle() {
                     break;
                 case (0x0009):
                     if (reg[x] != reg[y]) {
-                        PC += 2;
+                        PC += 1;
                     }
+                    break;
+                case (0x000E):
+                    reg[0xF] = reg[x] >> 7;
+                    reg[x] <<= 1;
                     break;
             }
             break;
@@ -197,7 +201,7 @@ void emulateCycle() {
             PC = nnn + reg[0x0];
             break;
         case (0xC000):
-            reg[x] = rand() & 0xff;
+            reg[x] = rand() & 0x00FF;
             break;
         case (0xD000):
             uint16_t height = temp;
@@ -214,9 +218,6 @@ void emulateCycle() {
                         }
 				    }
 			    }
-            screen[10 * SCREEN_WIDTH + 10] = true; // Set a pixel at position (10, 10)
-            screen[20 * SCREEN_WIDTH + 30] = true; // Set a pixel at position (30, 20)
-            printf("test");
             drawFlag = true;
             break;
         case (0xE000):
@@ -258,33 +259,34 @@ void emulateCycle() {
                     I = reg[x] * 5; // fix this wtf this mean??
                     break;
                 case (0x0033):
-                    char hex_str[20];
-                    long dec_num;
-                    sprintf(hex_str, "%X", opcode);
-                    dec_num = strtol(hex_str, NULL, 16);
-                    memory[I] = dec_num / 100;
-                    memory[I + 1] = (dec_num % 100) / 10;
-                    memory[I + 2] = dec_num % 10;
+                    //char hex_str[20];
+                    //long dec_num;
+                    //sprintf(hex_str, "%X", opcode);
+                    //dec_num = strtol(hex_str, NULL, 16);
+                    memory[I] = (memory[x] % 1000) / 100;
+                    memory[I + 1] = (memory[x] % 100) / 10;
+                    memory[I + 2] = memory[x] % 10;
                     break;
                 case (0x0055):
-                    for (int i = 0; i < 16; i++) {
+                    for (int i = 0; i <= x; i++) {
                         memory[I + i] = reg[i]; // might wanna change the 0xF thing
                     }
                     break;
                 case (0x0065):
-                    for (int i = 0; i < 16; i++) {
+                    for (int i = 0; i <= x; i++) {
                         reg[i] = memory[I + i]; // might wanna change the 0xF thing
                     }
                     break;
             }
             break;
+        default:
+            printf("errorrrrrrrrrrrr");
     }
     if (delay > 0) delay--;
     if (sound > 0) {
         sound--;
         //printf("beeeeeep");
     }
-    PC += 2;
 }
 
 bool initializeSDL(SDL_Window** window, SDL_Renderer** renderer) {
@@ -350,7 +352,7 @@ int main(int argc, char** argv) {
     bool quit = false;
     SDL_Event e;
     while (!quit) {
-        SDL_PumpEvents();
+        //SDL_PumpEvents();
         // Handle events
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
