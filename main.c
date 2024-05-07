@@ -87,12 +87,12 @@ void emulateCycle() {
     uint8_t temp = opcode & 0x000F;
     uint8_t temp2 = opcode & 0x00FF;
     uint16_t VF;
-    uint16_t result;
+    int result;
 
     // decode
     switch (opcode & 0xF000) {
         case (0x0000):
-            switch (temp2) {
+            switch (kk) {
                 case (0x00E0):
                     for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
                         screen[i] = false;
@@ -139,7 +139,7 @@ void emulateCycle() {
                     reg[x] = reg[y];
                     break;
                 case (0x0001):
-                    reg[x] = reg[x] || reg[y];
+                    reg[x] = reg[x] | reg[y];
                     break;
                 case (0x0002):
                     reg[x] = reg[x] && reg[y];
@@ -165,6 +165,7 @@ void emulateCycle() {
                     else {
                         reg[0xF] = 0;
                     }
+                    reg[x] = result;
                     break;
                 case (0x0006):
                     reg[x] = reg[x] >> 1;
@@ -194,6 +195,10 @@ void emulateCycle() {
                     break;
             }
             break;
+        case (0x9000):
+            if (reg[x] != reg[y]) {
+                PC += 2;
+            }
         case (0xA000):
             I = nnn;
             break;
@@ -201,29 +206,29 @@ void emulateCycle() {
             PC = nnn + reg[0x0];
             break;
         case (0xC000):
-            reg[x] = rand() & 0x00FF;
+            reg[x] = (rand() % 0x100) & (kk);
             break;
         case (0xD000):
             uint16_t height = temp;
             uint8_t pixel;
             reg[0xF] = 0;
-            	for (int yline = 0; yline < height; yline++) {
-				    pixel = memory[I + yline];
-                    for(int xline = 0; xline < 8; xline++) {
-                        if((pixel & (0x80 >> xline)) != 0) {
-                            if(screen[(reg[x] + xline + ((reg[y] + yline) * SCREEN_WIDTH))] == 1){
-                                reg[0xF] = 1;                                   
-                            }
-                            screen[reg[x] + xline + ((reg[y] + yline) * SCREEN_WIDTH)] ^= 1;
+            for (int yline = 0; yline < height; yline++) {
+				pixel = memory[I + yline];
+                for(int xline = 0; xline < 8; xline++) {
+                    if((pixel & (0x80 >> xline)) != 0) {
+                        if(screen[(reg[x] + xline + ((reg[y] + yline) * SCREEN_WIDTH))] == 1){
+                            reg[0xF] = 1;                                   
                         }
-				    }
-			    }
+                        screen[reg[x] + xline + ((reg[y] + yline) * SCREEN_WIDTH)] ^= 1;
+                    }
+				}
+			}
             drawFlag = true;
             break;
         case (0xE000):
-            switch (temp2){
+            switch (kk){
                 case (0x009E):
-                    if (keyboard[reg[x]]) { // is key pressed down?
+                    if (keyboard[reg[x]] != 0) { // is key pressed down?
                     PC += 2;
                     break;
                 }
@@ -235,14 +240,19 @@ void emulateCycle() {
             }
             break;
         case (0xF000):
-            switch (temp2){
+            switch (kk){
                 case (0x0007):
                     reg[x] = delay;
                     break;
                 case (0x000A):
+                int pressed = 0;
                     for (int i = 0; i < 16; i++) {
                         if (keyboard[i]) {
                             reg[x] = i;
+                            pressed = 1;
+                        }
+                        if (pressed == 0) {
+                            PC -= 2;
                         }
                     }
                     break;
@@ -263,9 +273,9 @@ void emulateCycle() {
                     //long dec_num;
                     //sprintf(hex_str, "%X", opcode);
                     //dec_num = strtol(hex_str, NULL, 16);
-                    memory[I] = (memory[x] % 1000) / 100;
-                    memory[I + 1] = (memory[x] % 100) / 10;
-                    memory[I + 2] = memory[x] % 10;
+                    memory[I] = (reg[x] % 1000) / 100;
+                    memory[I + 1] = (reg[x] % 100) / 10;
+                    memory[I + 2] = reg[x] % 10;
                     break;
                 case (0x0055):
                     for (int i = 0; i <= x; i++) {
@@ -280,7 +290,7 @@ void emulateCycle() {
             }
             break;
         default:
-            printf("errorrrrrrrrrrrr");
+            printf("---ERROR--- Opcode: 0x%04X\n", opcode);
     }
     if (delay > 0) delay--;
     if (sound > 0) {
@@ -357,7 +367,27 @@ int main(int argc, char** argv) {
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
                 quit = true;
-            }
+            } else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
+                // Handle key press or release events
+                switch (e.key.keysym.sym) {
+                    case SDLK_x: keyboard[0x0] = (e.type == SDL_KEYDOWN); break; // 0
+                    case SDLK_1: keyboard[0x1] = (e.type == SDL_KEYDOWN); break; // 1
+                    case SDLK_2: keyboard[0x2] = (e.type == SDL_KEYDOWN); break; // 2
+                    case SDLK_3: keyboard[0x3] = (e.type == SDL_KEYDOWN); break; // 3
+                    case SDLK_q: keyboard[0x4] = (e.type == SDL_KEYDOWN); break; // 4
+                    case SDLK_w: keyboard[0x5] = (e.type == SDL_KEYDOWN); break; // 5
+                    case SDLK_e: keyboard[0x6] = (e.type == SDL_KEYDOWN); break; // 6
+                    case SDLK_a: keyboard[0x7] = (e.type == SDL_KEYDOWN); break; // 7
+                    case SDLK_s: keyboard[0x8] = (e.type == SDL_KEYDOWN); break; // 8
+                    case SDLK_d: keyboard[0x9] = (e.type == SDL_KEYDOWN); break; // 9
+                    case SDLK_z: keyboard[0xA] = (e.type == SDL_KEYDOWN); break; // A
+                    case SDLK_c: keyboard[0xB] = (e.type == SDL_KEYDOWN); break; // B
+                    case SDLK_4: keyboard[0xC] = (e.type == SDL_KEYDOWN); break; // C
+                    case SDLK_r: keyboard[0xD] = (e.type == SDL_KEYDOWN); break; // D
+                    case SDLK_f: keyboard[0xE] = (e.type == SDL_KEYDOWN); break; // E
+                    case SDLK_v: keyboard[0xF] = (e.type == SDL_KEYDOWN); break; // F
+                    }
+                }
         }
         emulateCycle();
         // Clear screen

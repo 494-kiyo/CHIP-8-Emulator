@@ -5,7 +5,7 @@
 #define MEMORY_START 0x200
 
 typedef struct chip8 {
-    uint8_t registers[16]{};
+    uint8_t registers[16]{0};
     uint8_t SP = 0xfa0;
     uint16_t IR;
     uint16_t PC = 0x200;
